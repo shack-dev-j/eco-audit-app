@@ -29,14 +29,17 @@ A purpose-built, high-impact web application designed to transform school, campu
 
 ## 🚀 One-Click Deploy to Vercel
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fshack-dev-j%2Feco-audit-app)
+
 This repository is pre-configured for instant deployment on [Vercel](https://vercel.com):
 
-1. Go to [vercel.com/new](https://vercel.com/new).
-2. Import this repository (`eco-audit-app`).
-3. Leave default settings (Framework Preset: **Vite**).
+1. Click the **Deploy** button above or go to [vercel.com/new](https://vercel.com/new).
+2. Select and import **`shack-dev-j/eco-audit-app`**.
+3. Leave default settings (Framework Preset: **Vite**, Build Command: `vite build`, Output Directory: `dist`).
 4. Click **Deploy**.
 
 Vercel will build the frontend into `dist/` and automatically deploy `/api/submissions` as a serverless endpoint.
+Any new commit pushed to the `main` branch will automatically trigger a production redeployment.
 
 ---
 
