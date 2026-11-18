@@ -15,7 +15,7 @@ import ScenarioPictureCard from '../components/ScenarioPictureCard';
 import AdminQrCampaignGenerator from '../components/AdminQrCampaignGenerator';
 import AdminQuestionEditor from '../components/AdminQuestionEditor';
 import { SCENARIOS } from '../data/scenarios';
-import { getLocalSubmissions, clearSubmissions } from '../services/submissionService';
+import { getLocalSubmissions, fetchRemoteSubmissions, clearSubmissions } from '../services/submissionService';
 import { sounds } from '../services/soundEffects';
 
 /**
@@ -36,9 +36,12 @@ export default function AdminPage({
   const [selectedScenarioId, setSelectedScenarioId] = useState('school');
   const [customPhotoModalOpen, setCustomPhotoModalOpen] = useState(false);
 
-  // Submissions Log
+  // Submissions Log & Live Remote Synchronization
   const [submissions, setSubmissions] = useState(() => getLocalSubmissions());
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('active'); // 'active' | 'syncing' | 'offline'
 
   // Modals
   const [posterScenario, setPosterScenario] = useState(null);
@@ -46,8 +49,55 @@ export default function AdminPage({
 
   const currentScenario = scenariosList.find(s => s.id === selectedScenarioId) || scenariosList[0];
 
-  const handleRefreshSubmissions = () => {
-    setSubmissions(getLocalSubmissions());
+  const loadSubmissions = async (silent = false) => {
+    if (!silent) setIsSyncing(true);
+    try {
+      const merged = await fetchRemoteSubmissions();
+      setSubmissions(merged);
+      setSyncStatus('active');
+      setLastSyncTime(new Date());
+    } catch (err) {
+      console.warn('Submissions sync error:', err);
+      setSyncStatus('offline');
+    } finally {
+      if (!silent) setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async (silent = false) => {
+      if (!silent && isMounted) setIsSyncing(true);
+      try {
+        const merged = await fetchRemoteSubmissions();
+        if (isMounted) {
+          setSubmissions(merged);
+          setSyncStatus('active');
+          setLastSyncTime(new Date());
+        }
+      } catch (err) {
+        console.warn('Submissions sync error:', err);
+        if (isMounted) setSyncStatus('offline');
+      } finally {
+        if (!silent && isMounted) setIsSyncing(false);
+      }
+    };
+
+    load();
+    // Poll every 4 seconds for live incoming mobile submissions over local Wi-Fi / LAN
+    const interval = setInterval(() => {
+      load(true);
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleRefreshSubmissions = async () => {
+    await loadSubmissions(false);
   };
 
   const handleToggleMute = () => {
@@ -68,6 +118,7 @@ export default function AdminPage({
 
     const headers = [
       'Submission ID',
+      'Origin',
       'Date',
       'Timestamp',
       'Participant Name',
@@ -85,6 +136,7 @@ export default function AdminPage({
 
     const rows = submissions.map(sub => [
       `"${sub.id || ''}"`,
+      `"${sub.origin || (sub.status === 'synced_remote' ? 'remote_mobile' : 'local')}"`,
       `"${sub.date || ''}"`,
       `"${sub.auditTimestamp || ''}"`,
       `"${(sub.participantName || '').replace(/"/g, '""')}"`,
@@ -110,9 +162,9 @@ export default function AdminPage({
     document.body.removeChild(link);
   };
 
-  const handleClearAll = () => {
-    if (window.confirm('Are you sure you want to clear all recorded submissions from local storage?')) {
-      clearSubmissions();
+  const handleClearAll = async () => {
+    if (window.confirm('Are you sure you want to clear all recorded submissions from both local and remote server storage? / Barcha auditlarni tozalashga ishonchingiz komilmi?')) {
+      await clearSubmissions();
       setSubmissions([]);
     }
   };
@@ -382,14 +434,25 @@ export default function AdminPage({
               </div>
 
               <div className="eco-card p-5 space-y-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
-                  Database Destination
-                </span>
-                <div className="text-sm font-bold text-amber-300">
-                  LocalStorage + Google Sheets
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400">
+                    Jonli Tarmoq Sinxronizatsiyasi
+                  </span>
+                  <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${syncStatus === 'active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                    <span className={`w-2 h-2 rounded-full ${syncStatus === 'active' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                    {syncStatus === 'active' ? 'Faol / Live' : 'Oflayn / Local'}
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <span>/api/submissions</span>
+                  {lastSyncTime && (
+                    <span className="text-xs text-slate-400 font-normal">
+                      ({lastSyncTime.toLocaleTimeString()})
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-400">
-                  Exportable to CSV or Real-Time Webhook
+                  Mobil telefonlardan kelgan auditlar avtomatik yangilanib turadi
                 </p>
               </div>
             </div>
@@ -411,10 +474,10 @@ export default function AdminPage({
                 <button
                   onClick={handleRefreshSubmissions}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors cursor-pointer"
-                  title="Reload submissions from storage"
+                  title="Reload submissions from storage and server"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Refresh</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+                  <span>{isSyncing ? 'Yangilanmoqda...' : 'Refresh'}</span>
                 </button>
 
                 <button
@@ -456,6 +519,7 @@ export default function AdminPage({
                   <table className="w-full text-left text-xs text-slate-200">
                     <thead className="bg-slate-900/90 text-emerald-400 uppercase tracking-wider text-[10px] font-extrabold border-b border-emerald-800/40">
                       <tr>
+                        <th className="p-3">Source</th>
                         <th className="p-3">Participant</th>
                         <th className="p-3">Role</th>
                         <th className="p-3">Lang</th>
@@ -470,6 +534,19 @@ export default function AdminPage({
                     <tbody className="divide-y divide-emerald-900/30">
                       {filteredSubmissions.map((sub, idx) => (
                         <tr key={sub.id || idx} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="p-3 whitespace-nowrap">
+                            {sub.origin === 'remote_mobile' || sub.status === 'synced_remote' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-700/50" title="Submitted over WiFi/Network">
+                                <span>📱</span>
+                                <span>Masofaviy</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700" title="Local browser entry">
+                                <span>💻</span>
+                                <span>Lokal</span>
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3 font-bold text-white whitespace-nowrap">
                             {sub.participantName || 'Anonymous'}
                           </td>

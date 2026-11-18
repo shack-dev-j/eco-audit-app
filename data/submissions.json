@@ -1,0 +1,21 @@
+[
+  {
+    "participantName": "Jasur Bek",
+    "participantRole": "Student",
+    "language": "uz",
+    "venueCategory": "Lighting & Electricity",
+    "venueSpecificSpot": "Katta zal, 2-qavat",
+    "scenarioTitle": "Maktab Sinfxonasi va Yo‘lak",
+    "selectedIssues": [
+      "Chiroqlar tanaffusda ochiq qolgan"
+    ],
+    "topPriorityTitle": "Chiroqlarni o‘chirish",
+    "priorityReason": "Katta energiya isrofi",
+    "practicalAction": "Tanaffusda chiroqni o‘chirish eslatmasi qo‘yish",
+    "timeToFix": "< 24 hrs",
+    "id": "audit-1795017335694-g3rv6",
+    "submittedAt": "2026-11-18T15:55:35.694Z",
+    "origin": "remote_mobile",
+    "status": "synced_remote"
+  }
+]
