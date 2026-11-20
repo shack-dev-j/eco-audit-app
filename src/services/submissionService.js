@@ -81,6 +81,20 @@ export const fetchRemoteSubmissions = async () => {
     // Network offline or endpoint unreachable - fallback to local storage
   }
 
+  // Fallback to public cloud Gist if /api/submissions yielded no items
+  if (remoteSubmissions.length === 0) {
+    try {
+      const rawGistUrl = 'https://gist.githubusercontent.com/shack-dev-j/393fca3786758541e1ffa25835329483/raw/submissions.json?t=' + Date.now();
+      const gistRes = await fetchWithTimeout(rawGistUrl, { method: 'GET', headers: { 'Accept': 'application/json' } }, 3000);
+      if (gistRes && gistRes.ok) {
+        const gistData = await gistRes.json();
+        if (Array.isArray(gistData) && gistData.length > 0) {
+          remoteSubmissions = gistData;
+        }
+      }
+    } catch (_) {}
+  }
+
   const localItems = getLocalSubmissions();
 
   // Merge map keyed by ID
@@ -104,6 +118,18 @@ export const fetchRemoteSubmissions = async () => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   } catch (_) {}
+
+  // Background sync for any pending local items
+  const unsynced = localItems.filter(item => item && item.status !== 'synced_remote');
+  if (unsynced.length > 0) {
+    unsynced.forEach(item => {
+      fetchWithTimeout('/api/submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(item)
+      }, 3000).catch(() => {});
+    });
+  }
 
   return merged;
 };

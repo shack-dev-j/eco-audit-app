@@ -233,7 +233,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
     sounds.init();
     sounds.playSpotSuccess();
     setCurrentStep('intro-15s');
-    setIntroTimeLeft(15);
+    setIntroTimeLeft(60);
     setIsIntroTimerRunning(true);
   };
 
@@ -242,7 +242,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
     sounds.playStageChime();
     setIsIntroTimerRunning(false);
     setCurrentStep('spot-60s');
-    setObservationTimeLeft(60);
+    setObservationTimeLeft(240);
     setIsObservationTimerRunning(true);
   };
 
@@ -265,7 +265,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   };
 
   // Step 4 -> Submit
-  const handleFinalSubmit = (e) => {
+  const handleFinalSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!practicalAction.trim()) {
       setValidationError(dict.validationNeedAction);
@@ -275,7 +275,9 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
     sounds.playStageChime();
 
     const topItem = activeIssues.find(i => i.id === topPriorityId) || activeIssues[0];
+    const nowIso = new Date().toISOString();
     const payload = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       scenarioId: scenario.id,
       scenarioTitle: scenario.title,
       venueCategory: qrZoneCategory || scenario.badge,
@@ -283,17 +285,17 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
       participantName: participantName.trim() || (lang === 'uz' ? "E'tiborli Auditor" : 'Mindful Auditor'),
       participantRole,
       language: lang,
-      date: new Date().toISOString().split('T')[0],
+      date: nowIso.split('T')[0],
       selectedIssues: activeIssues.map(i => i.title),
       topPriorityId,
       topPriorityTitle: topItem?.title || (lang === 'uz' ? 'Asosiy Eko-Maqsad' : 'Primary Eco Target'),
       priorityReason: priorityReason.trim() || (lang === 'uz' ? 'Katta samara beruvchi asosiy tejamkorlik imkoniyati.' : 'Highest leverage opportunity for tangible impact.'),
       practicalAction: practicalAction.trim(),
       timeToFix,
-      auditTimestamp: new Date().toISOString()
+      auditTimestamp: nowIso,
+      submittedAt: nowIso
     };
 
-    saveSubmission(payload);
     setLastSubmission(payload);
     setCurrentStep('certificate');
 
@@ -305,6 +307,8 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
         colors: ['#2d4534', '#8b4a32', '#d4af37', '#7a9980', '#e4dcd0']
       });
     } catch (_) {}
+
+    await saveSubmission(payload);
   };
 
   // Reset / Start Over

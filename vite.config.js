@@ -13,6 +13,8 @@ import path from 'node:path'
 function submissionApiPlugin() {
   const dataDir = path.resolve(process.cwd(), 'data');
   const dataFile = path.join(dataDir, 'submissions.json');
+  const GIST_ID = process.env.GIST_ID || '393fca3786758541e1ffa25835329483';
+  const GIST_TOKEN = process.env.GIST_TOKEN || process.env.GITHUB_TOKEN;
 
   const ensureStorage = () => {
     if (!fs.existsSync(dataDir)) {
@@ -37,6 +39,22 @@ function submissionApiPlugin() {
   const writeSubmissions = (subs) => {
     ensureStorage();
     fs.writeFileSync(dataFile, JSON.stringify(subs, null, 2), 'utf-8');
+  };
+
+  const syncGistBackground = (subs) => {
+    try {
+      fetch(`https://api.github.com/gists/${GIST_ID}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${GIST_TOKEN}`,
+          'User-Agent': 'The-60-Second-Eco-Audit-DevServer',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          files: { 'submissions.json': { content: JSON.stringify(subs, null, 2) } }
+        })
+      }).catch(() => {});
+    } catch (_) {}
   };
 
   const handleMiddleware = (req, res, next) => {
@@ -72,11 +90,12 @@ function submissionApiPlugin() {
             ...item,
             id: item.id || `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             submittedAt: item.submittedAt || new Date().toISOString(),
-            origin: 'remote_mobile',
+            origin: item.origin || 'remote_mobile',
             status: 'synced_remote'
           };
           const updated = [enriched, ...subs.filter(s => s.id !== enriched.id)];
           writeSubmissions(updated);
+          syncGistBackground(updated);
           res.statusCode = 201;
           return res.end(JSON.stringify({ success: true, submission: enriched }));
         } catch (err) {
@@ -89,6 +108,7 @@ function submissionApiPlugin() {
 
     if (req.method === 'DELETE') {
       writeSubmissions([]);
+      syncGistBackground([]);
       res.statusCode = 200;
       return res.end(JSON.stringify({ success: true, count: 0, submissions: [] }));
     }
@@ -114,6 +134,11 @@ export default defineConfig({
     tailwindcss(),
     submissionApiPlugin(),
   ],
+  server: {
+    watch: {
+      ignored: ['**/data/**', '**/screenshots/**']
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',
