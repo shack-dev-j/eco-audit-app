@@ -1,5 +1,28 @@
 [
   {
+    "id": "audit-1795168461869-p338",
+    "scenarioId": "staff-lounge",
+    "scenarioTitle": "O‘qituvchilar va Xodimlar Dam Olish Xonasi",
+    "venueCategory": "Xodimlar Eko-Auditi",
+    "venueSpecificSpot": "General Area",
+    "participantName": "Anvar Qodirov",
+    "participantRole": "Student",
+    "language": "uz",
+    "date": "2026-11-20",
+    "selectedIssues": [
+      "Seramika Krujkalar Turgan Holda Bir Martalik Stakanlar Isrofi"
+    ],
+    "topPriorityId": "issue-1",
+    "topPriorityTitle": "Seramika Krujkalar Turgan Holda Bir Martalik Stakanlar Isrofi",
+    "priorityReason": "Katta samara beruvchi asosiy tejamkorlik imkoniyati.",
+    "practicalAction": "Tanaffus va dars tugaganda chiroqlarni o‘chirish uchun o‘quvchilar navbatchiligini tashkil qilamiz.",
+    "timeToFix": "Immediate Quick Win (< 24 hrs)",
+    "auditTimestamp": "2026-11-20T09:54:21.869Z",
+    "submittedAt": "2026-11-20T09:54:21.869Z",
+    "status": "synced_remote",
+    "origin": "remote_mobile"
+  },
+  {
     "id": "audit-1795166631764-kz09",
     "scenarioId": "grounds",
     "scenarioTitle": "Maktab Kirish Qismi va Avtoturargoh",

@@ -51,13 +51,15 @@ async function verifyFlow() {
   console.log('🔍 3. In Phase 2: Spotting & 4-minute timer');
   await page.screenshot({ path: path.join(screenshotDir, '3_spotting_timer.png'), fullPage: true });
 
-  // Type or click quick issue suggestion
-  const quickPill = page.locator('button:has-text("Chiroqlar"), button:has-text("Lights")').first();
+  // Type or click quick issue suggestion (any suggestion pill starting with +)
+  const quickPill = page.locator('button:has-text("+ ")').first();
   if (await quickPill.count() > 0) {
     await quickPill.click();
   } else {
-    const issueInput = page.locator('input[placeholder*="muammo"], input[placeholder*="issue"]').first();
-    await issueInput.fill('Chiroqlar kunduzi ham ochiq qolgan, behuda energiya sarfi.');
+    const anyPill = page.locator('button:has-text("Chiroqlar"), button:has-text("Lights")').first();
+    if (await anyPill.count() > 0) {
+      await anyPill.click();
+    }
   }
 
   const nextToPrioritizeBtn = page.locator('button:has-text("Saralashga"), button:has-text("Prioritise"), button:has-text("Prioritize")').first();
