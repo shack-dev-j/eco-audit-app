@@ -1,5 +1,28 @@
 [
   {
+    "id": "audit-1795187461781-9llq",
+    "scenarioId": "office",
+    "scenarioTitle": "Xodimlar va Ma’muriy Xona",
+    "venueCategory": "Ofis Eko-Auditi",
+    "venueSpecificSpot": "General Area",
+    "participantName": "Anvar Qodirov",
+    "participantRole": "Student",
+    "language": "uz",
+    "date": "2026-11-20",
+    "selectedIssues": [
+      "Kechasi O‘chirilmagan Monitorlar"
+    ],
+    "topPriorityId": "issue-1",
+    "topPriorityTitle": "Kechasi O‘chirilmagan Monitorlar",
+    "priorityReason": "Katta samara beruvchi asosiy tejamkorlik imkoniyati.",
+    "practicalAction": "Tanaffus va dars tugaganda chiroqlarni o‘chirish uchun o‘quvchilar navbatchiligini tashkil qilamiz.",
+    "timeToFix": "Immediate Quick Win (< 24 hrs)",
+    "auditTimestamp": "2026-11-20T15:11:01.777Z",
+    "submittedAt": "2026-11-20T15:11:01.777Z",
+    "status": "synced_remote",
+    "origin": "remote_mobile"
+  },
+  {
     "id": "audit-1795168461869-p338",
     "scenarioId": "staff-lounge",
     "scenarioTitle": "O‘qituvchilar va Xodimlar Dam Olish Xonasi",
