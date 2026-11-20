@@ -18,7 +18,11 @@ const CATEGORY_PRESETS = [
   { id: 'gym', nameEn: 'Gymnasium & Sports Arena', nameUz: 'Sport Zali va Kiyinish Xonasi', defaultScenario: 'gym' },
   { id: 'computer-lab', nameEn: 'Computer & IT Suite', nameUz: 'Informatika Xonasi va Server', defaultScenario: 'computer-lab' },
   { id: 'garden', nameEn: 'Campus Garden & Greenhouse', nameUz: 'Maktab Bog‘i va Issiqxona', defaultScenario: 'garden' },
-  { id: 'grounds', nameEn: 'School Entrance & Grounds', nameUz: 'Maktab Kirish Qismi va Hovli', defaultScenario: 'grounds' }
+  { id: 'grounds', nameEn: 'School Entrance & Grounds', nameUz: 'Maktab Kirish Qismi va Hovli', defaultScenario: 'grounds' },
+  { id: 'art-studio', nameEn: 'Art & Design Creative Studio', nameUz: 'Tasviriy San’at va Dizayn Studiyasi', defaultScenario: 'art-studio' },
+  { id: 'staff-lounge', nameEn: 'Teachers’ Lounge & Breakroom', nameUz: 'O‘qituvchilar va Xodimlar Dam Olish Xonasi', defaultScenario: 'staff-lounge' },
+  { id: 'greenhouse', nameEn: 'Eco-Center & Botanical Greenhouse', nameUz: 'Eko-Markaz va Botanika Issiqxonasi', defaultScenario: 'greenhouse' },
+  { id: 'dynamic-shuffle', nameEn: '🎲 Dynamic Shuffle (Unique Picture for Everyone)', nameUz: '🎲 Dinamik Tasodifiy (Har kimga har xil rasm)', defaultScenario: 'dynamic' }
 ];
 
 const PART_PRESETS = {
@@ -31,7 +35,11 @@ const PART_PRESETS = {
   gym: ['High-Bay Arena Floodlights', 'Locker Room Showers', 'Bleachers & Water Bottles', 'Equipment Storage Room'],
   'computer-lab': ['30 Desktop Terminals', 'Split Air Conditioner & Door', 'Central Copier/Printer', 'Network Server Rack'],
   garden: ['Irrigation Hose & Tap', 'Raised Vegetable Planter Beds', 'Compost & Organic Pile', 'Greenhouse Ventilation'],
-  grounds: ['Drop-off Vehicle Idling Zone', 'Midday Security Spotlights', 'Perimeter Trash Cans', 'Main Arrival Gate']
+  grounds: ['Drop-off Vehicle Idling Zone', 'Midday Security Spotlights', 'Perimeter Trash Cans', 'Main Arrival Gate'],
+  'art-studio': ['Paint Wash Sink & Faucet', 'Skylight Track Lights', 'Drawing Paper Cutters', 'Recycling & Food Bins', 'Tool Power Strips'],
+  'staff-lounge': ['Coffee Machine & Mugs Counter', 'Phone & Laptop Charging Strip', 'General Trash & Food Scraps', 'Window & Radiator Heater'],
+  greenhouse: ['Garden Hose Nozzle & Pathway', 'Parched Planter Beds', 'Greenhouse Door & Heaters', 'Outdoor Benches & Litter'],
+  'dynamic-shuffle': ['Every Respondent Gets a Different Picture 🎲', 'Multi-Zone Mixed Contexts', 'Automatic Pool Rotation']
 };
 
 export default function AdminQrCampaignGenerator() {
@@ -71,9 +79,13 @@ export default function AdminQrCampaignGenerator() {
   const targetUrl = (() => {
     const base = hostUrl.replace(/\/+$/, '');
     const params = new URLSearchParams();
-    params.set('scenario', selectedScenarioId);
-    if (categoryName) params.set('category', categoryName);
-    if (partName) params.set('part', partName);
+    if (selectedCategory === 'dynamic-shuffle') {
+      params.set('shuffle', '1');
+    } else {
+      params.set('scenario', selectedScenarioId);
+    }
+    if (categoryName && selectedCategory !== 'dynamic-shuffle') params.set('category', categoryName);
+    if (partName && selectedCategory !== 'dynamic-shuffle') params.set('part', partName);
     if (selectedLanguage) params.set('lang', selectedLanguage);
     if (preselectedRole) params.set('role', preselectedRole);
     return `${base}/?${params.toString()}`;

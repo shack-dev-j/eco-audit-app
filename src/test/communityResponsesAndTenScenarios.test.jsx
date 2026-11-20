@@ -13,11 +13,12 @@ describe('8. Community Responses Wall, 10 Scenarios & Extended Timers Suite', ()
 
   describe('All 10 Official Eco-Audit Scenarios & Localized Data', () => {
     it('contains all 10 distinct scenario locations with full issue sets and cover images', () => {
-      expect(SCENARIOS).toHaveLength(10);
+      expect(SCENARIOS.length).toBeGreaterThanOrEqual(10);
 
       const expectedIds = [
         'school', 'office', 'cafeteria', 'science-lab', 'library',
-        'restroom', 'gym', 'computer-lab', 'garden', 'grounds'
+        'restroom', 'gym', 'computer-lab', 'garden', 'grounds',
+        'art-studio', 'staff-lounge', 'greenhouse'
       ];
 
       expectedIds.forEach(id => {

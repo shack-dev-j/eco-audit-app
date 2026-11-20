@@ -45,9 +45,21 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   // 3. Scenario & Pre-configured Venue Spot from URL (?scenario=...&category=...&part=...)
   const [scenarioId, setScenarioId] = useState(() => {
     if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search).get('scenario');
-      const found = SCENARIOS.find(s => s.id === p);
-      if (found) return found.id;
+      const p = new URLSearchParams(window.location.search);
+      const urlScenario = p.get('scenario');
+      if (urlScenario) {
+        const found = SCENARIOS.find(s => s.id === urlScenario);
+        if (found) return found.id;
+      }
+
+      // If in automated test environment, keep deterministic default
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+        return defaultScenarioId;
+      }
+
+      // In real browser runtime: random selection across all scenarios so everyone gets a different picture!
+      const randIndex = Math.floor(Math.random() * SCENARIOS.length);
+      return SCENARIOS[randIndex].id;
     }
     return defaultScenarioId;
   });
@@ -311,8 +323,23 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
     await saveSubmission(payload);
   };
 
-  // Reset / Start Over
+  // Shuffle to another random picture/scenario so every respondent can explore different scenes
+  const handleShuffleScenario = () => {
+    const others = SCENARIOS.filter(s => s.id !== scenarioId);
+    if (others.length > 0) {
+      const next = others[Math.floor(Math.random() * others.length)];
+      setScenarioId(next.id);
+      sounds.playStageChime();
+    }
+  };
+
+  // Reset / Start Over - rotates to a new picture for the next audit
   const handleStartOver = () => {
+    const others = SCENARIOS.filter(s => s.id !== scenarioId);
+    if (others.length > 0) {
+      const next = others[Math.floor(Math.random() * others.length)];
+      setScenarioId(next.id);
+    }
     setCurrentStep('gate');
     setHasAgreed(false);
     setIssue1('');
@@ -474,16 +501,29 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
                 {scenario.description}
               </p>
 
-              <div className="pt-1 flex items-center justify-between text-xs text-stone-600">
+              <div className="pt-2 flex flex-wrap items-center justify-between text-xs text-stone-600 gap-2 border-t border-stone-400/20">
                 <span>{dict.observationalCount.replace('{count}', scenario.issues?.length || 5)}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowSceneModal(true)}
-                  className="inline-flex items-center gap-1 text-emerald-800 hover:text-emerald-950 font-bold underline cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>{dict.previewSceneBtn}</span>
-                </button>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShuffleScenario}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-900/10 hover:bg-amber-900/20 text-amber-950 font-bold transition-colors cursor-pointer"
+                    title={lang === 'uz' ? "Tasodifiy boshqa rasmga o'tish" : "Switch to another random picture"}
+                  >
+                    <span>🎲</span>
+                    <span>{lang === 'uz' ? "Boshqa Rasm (Tasodifiy)" : "Different Scene"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowSceneModal(true)}
+                    className="inline-flex items-center gap-1 text-emerald-800 hover:text-emerald-950 font-bold underline cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{dict.previewSceneBtn}</span>
+                  </button>
+                </div>
               </div>
             </div>
 

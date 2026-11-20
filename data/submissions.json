@@ -1,5 +1,28 @@
 [
   {
+    "id": "audit-1795157848342-k1hq",
+    "scenarioId": "school",
+    "scenarioTitle": "Maktab Sinfxonasi va Yo‘lak",
+    "venueCategory": "Sinfxona Eko-Auditi",
+    "venueSpecificSpot": "General Area",
+    "participantName": "Anvar Qodirov",
+    "participantRole": "Student",
+    "language": "uz",
+    "date": "2026-11-20",
+    "selectedIssues": [
+      "Kunduzi Yoqiq Qolgan Chiroqlar"
+    ],
+    "topPriorityId": "issue-1",
+    "topPriorityTitle": "Kunduzi Yoqiq Qolgan Chiroqlar",
+    "priorityReason": "Katta samara beruvchi asosiy tejamkorlik imkoniyati.",
+    "practicalAction": "Tanaffus va dars tugaganda chiroqlarni o‘chirish uchun o‘quvchilar navbatchiligini tashkil qilamiz.",
+    "timeToFix": "Immediate Quick Win (< 24 hrs)",
+    "auditTimestamp": "2026-11-20T06:57:28.339Z",
+    "submittedAt": "2026-11-20T06:57:28.339Z",
+    "status": "synced_remote",
+    "origin": "remote_mobile"
+  },
+  {
     "id": "audit-1795157680991-ms1w",
     "scenarioId": "school",
     "scenarioTitle": "Maktab Sinfxonasi va Yo‘lak",
