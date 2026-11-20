@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { Award, CheckCircle2, Download, RefreshCw, Sparkles, Printer, Share2 } from 'lucide-react';
+import { Award, CheckCircle2, Download, RefreshCw, Sparkles, Printer, Share2, Users } from 'lucide-react';
 import { sounds } from '../services/soundEffects';
 import BespokeButton from './design-system/BespokeButton';
 
@@ -9,6 +9,7 @@ export default function PledgeCertificate({
   scenario, 
   onRestart, 
   onOpenDebrief,
+  onViewCommunityResponses,
   theme = 'herbarium',
   lang = 'uz' 
 }) {
@@ -118,6 +119,17 @@ export default function PledgeCertificate({
 
       {/* Bespoke Action Buttons */}
       <div className="flex flex-wrap items-center justify-center gap-3 pt-2 print:hidden">
+        {onViewCommunityResponses && (
+          <BespokeButton
+            onClick={onViewCommunityResponses}
+            theme="theme-herbarium"
+            icon={Users}
+            className="bg-emerald-800 text-white hover:bg-emerald-900 shadow-md font-black"
+          >
+            {isUz ? "Boshqalarning Javoblarini Ko'rish" : "See Others' Responses"}
+          </BespokeButton>
+        )}
+
         <BespokeButton
           onClick={handlePrint}
           theme="theme-herbarium"

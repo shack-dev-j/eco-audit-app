@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Clock, CheckCircle2, ShieldCheck, Sparkles, ArrowRight, ArrowLeft, 
   Volume2, VolumeX, Eye, RotateCcw, AlertTriangle, Check, 
-  Leaf, Feather, Send, HelpCircle, Layers, Globe, MapPin, QrCode
+  Leaf, Feather, Send, HelpCircle, Layers, Globe, MapPin, QrCode, Users
 } from 'lucide-react';
 import BiosphereTimerBackground from '../components/BiosphereTimerBackground';
 import BespokeInput from '../components/design-system/BespokeInput';
@@ -11,7 +11,8 @@ import BespokeButton from '../components/design-system/BespokeButton';
 import BespokePebblePicker from '../components/design-system/BespokePebblePicker';
 import BespokeActionCard from '../components/design-system/BespokeActionCard';
 import PledgeCertificate from '../components/PledgeCertificate';
-import { SCENARIOS } from '../data/scenarios';
+import CommunityResponsesView from '../components/CommunityResponsesView';
+import { SCENARIOS, getLocalizedScenario } from '../data/scenarios';
 import { sounds } from '../services/soundEffects';
 import { saveSubmission } from '../services/submissionService';
 import { getStoredLanguage, setStoredLanguage, DICTIONARY, getTranslation } from '../services/localization';
@@ -26,16 +27,17 @@ import confetti from 'canvas-confetti';
  * 3. Dynamic custom questions from Admin Question Editor.
  * 4. Automatic pre-population of Venue Category & Specific Spot from scanned QR codes.
  * 5. Sequential Message Progression upon agreement:
- *    - 15s Spatial Observation
- *    - 60s Observation Challenge
- *    - 30s Prioritisation Question
- *    - 30s Practical Action Pledge
+ *    - 60s (1 min) Spatial Observation & Contemplation ("Look closely...")
+ *    - 240s (4 min) Observation & Writing Challenge (Spot up to 3 issues)
+ *    - 30s Prioritisation Question ("Which issue would you tackle first, and why?")
+ *    - 30s Practical Action Pledge ("What is one realistic first step today?")
  *    - Completion Ceremony & Personalized Eco-Pledge Certificate
+ *    - Community Responses Wall ("See Others' Responses")
  */
 export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   // 1. Language Toggle: 'uz' (O'zbekcha) | 'en' (English)
   const [lang, setLang] = useState(() => getStoredLanguage());
-  const dict = DICTIONARY[lang] || DICTIONARY.en;
+  const dict = DICTIONARY[lang] || DICTIONARY.uz || DICTIONARY.en;
 
   // 2. Custom Questions from Admin
   const [customQuestions, setCustomQuestions] = useState(() => getQuestionSettings());
@@ -53,13 +55,14 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   const [qrZoneCategory, setQrZoneCategory] = useState('');
   const [qrSpecificPart, setQrSpecificPart] = useState('');
 
-  const scenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
+  const rawScenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
+  const scenario = getLocalizedScenario(rawScenario, lang);
 
   // 4. Audio Mute
   const [isMuted, setIsMuted] = useState(false);
 
   // 5. State Machine Progression:
-  // 'gate' -> 'intro-15s' -> 'spot-60s' -> 'prioritize-30s' -> 'action-30s' -> 'certificate'
+  // 'gate' -> 'intro-15s' (now 60s) -> 'spot-60s' (now 240s/4min) -> 'prioritize-30s' -> 'action-30s' -> 'certificate' -> 'community-responses'
   const [currentStep, setCurrentStep] = useState('gate');
   const [hasAgreed, setHasAgreed] = useState(false);
 
@@ -67,11 +70,18 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   const [participantName, setParticipantName] = useState('');
   const [participantRole, setParticipantRole] = useState('Student');
 
-  // 7. Timers
-  const [observationTimeLeft, setObservationTimeLeft] = useState(60);
+  // 7. Timers (1 minute staring/observation contemplation, 4 minutes writing & spotting)
+  const [observationTimeLeft, setObservationTimeLeft] = useState(240);
   const [isObservationTimerRunning, setIsObservationTimerRunning] = useState(false);
-  const [introTimeLeft, setIntroTimeLeft] = useState(15);
+  const [introTimeLeft, setIntroTimeLeft] = useState(60);
   const [isIntroTimerRunning, setIsIntroTimerRunning] = useState(false);
+
+  // Timer helper: format seconds into MM:SS
+  const formatTimer = (totalSec) => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // 8. Form Observations & Action Pledge
   const [issue1, setIssue1] = useState('');
@@ -103,6 +113,12 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
 
     const prt = p.get('part');
     if (prt) setQrSpecificPart(prt);
+
+    // Check view param (?view=responses)
+    const view = p.get('view');
+    if (view === 'responses' || view === 'community') {
+      setCurrentStep('community-responses');
+    }
 
     // Check URL language override (?lang=uz or ?lang=en)
     const urlLang = p.get('lang');
@@ -300,9 +316,9 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
     setIssue3('');
     setPriorityReason('');
     setPracticalAction('');
-    setObservationTimeLeft(60);
+    setObservationTimeLeft(240);
     setIsObservationTimerRunning(false);
-    setIntroTimeLeft(15);
+    setIntroTimeLeft(60);
     setIsIntroTimerRunning(false);
     setLastSubmission(null);
   };
@@ -310,12 +326,13 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   // Background timer progress
   const timerProgress = 
     currentStep === 'certificate' ? 1 :
-    currentStep === 'spot-60s' ? (60 - observationTimeLeft) / 60 :
-    currentStep === 'intro-15s' ? (15 - introTimeLeft) / 15 :
+    currentStep === 'community-responses' ? 1 :
+    currentStep === 'spot-60s' ? (240 - observationTimeLeft) / 240 :
+    currentStep === 'intro-15s' ? (60 - introTimeLeft) / 60 :
     currentStep === 'prioritize-30s' ? 0.75 :
     currentStep === 'action-30s' ? 0.9 : 0;
 
-  const isUrgent = currentStep === 'spot-60s' && observationTimeLeft <= 10 && observationTimeLeft > 0;
+  const isUrgent = currentStep === 'spot-60s' && observationTimeLeft <= 15 && observationTimeLeft > 0;
 
   // Active question overrides from Admin
   const activeQuestions = customQuestions[lang] || customQuestions.en;
@@ -327,15 +344,15 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
       <BiosphereTimerBackground
         progress={timerProgress}
         isUrgent={isUrgent}
-        stage={currentStep === 'certificate' ? 'completed' : 'spot'}
+        stage={currentStep === 'certificate' || currentStep === 'community-responses' ? 'completed' : 'spot'}
         theme="herbarium"
       />
 
       {/* Main Container */}
-      <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
         
-        {/* Subtle Language Switcher & Audio Bar */}
-        <div className="flex items-center justify-between pb-1">
+        {/* Subtle Language Switcher, Community Link & Audio Bar */}
+        <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
           {/* Language Switcher Pill */}
           <div className="inline-flex items-center p-1 rounded-full bg-stone-900/80 backdrop-blur-md border border-stone-700/60 shadow-md">
             <button
@@ -361,15 +378,28 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
             </button>
           </div>
 
-          {/* Sound Mute Toggle */}
-          <button
-            type="button"
-            onClick={handleToggleMute}
-            className="p-2 rounded-full bg-stone-900/80 text-stone-300 hover:text-white border border-stone-700/60 shadow-md cursor-pointer transition-colors"
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Community Responses Wall Button */}
+            <button
+              type="button"
+              onClick={() => setCurrentStep(currentStep === 'community-responses' ? (lastSubmission ? 'certificate' : 'gate') : 'community-responses')}
+              className="px-3 py-1.5 rounded-full bg-stone-900/80 text-stone-200 hover:text-white border border-stone-700/60 shadow-md cursor-pointer transition-all flex items-center gap-1.5 text-[11px] font-bold"
+              title={lang === 'uz' ? "Boshqalarning javoblarini ko'rish" : "See others' responses"}
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{currentStep === 'community-responses' ? (lang === 'uz' ? 'Orqaga' : 'Back') : (lang === 'uz' ? "Javoblar" : "Responses")}</span>
+            </button>
+
+            {/* Sound Mute Toggle */}
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              className="p-2 rounded-full bg-stone-900/80 text-stone-300 hover:text-white border border-stone-700/60 shadow-md cursor-pointer transition-colors"
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
         </div>
 
         {/* =========================================================================
@@ -559,8 +589,12 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
             {/* Scene Drawing Card */}
             <div className="eco-card p-4 space-y-3">
               <div className="relative aspect-[16/10] bg-stone-900 rounded-lg overflow-hidden border border-stone-400/40 shadow-inner">
-                {scenario.customImageUrl ? (
-                  <img src={scenario.customImageUrl} alt={scenario.title} className="w-full h-full object-cover" />
+                {scenario.customImageUrl || scenario.coverImage ? (
+                  <img 
+                    src={scenario.customImageUrl || scenario.coverImage} 
+                    alt={scenario.title} 
+                    className="w-full h-full object-cover" 
+                  />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-emerald-950 to-stone-900 p-6 text-center text-stone-200">
                     <span className="text-5xl">🏛️</span>
@@ -575,7 +609,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
               <div className="flex items-center gap-2 text-stone-700 text-xs font-bold">
                 <Clock className="w-4 h-4 text-emerald-800" />
-                <span>{dict.introTimerRemaining.replace('{seconds}', introTimeLeft)}</span>
+                <span>{dict.introTimerRemaining.replace('{seconds}', formatTimer(introTimeLeft))}</span>
               </div>
 
               <BespokeButton
@@ -592,7 +626,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
         )}
 
         {/* =========================================================================
-            PHASE 2: 60-SECOND OBSERVATION CHALLENGE ("Find as many as you can — spot up to 3 eco-issues.")
+            PHASE 2: 4-MINUTE OBSERVATION CHALLENGE ("Find as many as you can — spot up to 3 eco-issues.")
             ========================================================================= */}
         {currentStep === 'spot-60s' && (
           <div className="eco-container p-6 sm:p-8 space-y-6 animate-in fade-in duration-300">
@@ -613,9 +647,11 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
                 >
                   <Clock className="w-4 h-4 text-emerald-800 self-center" />
                   <span className="text-xl sm:text-2xl font-black font-mono">
-                    {observationTimeLeft}
+                    {formatTimer(observationTimeLeft)}
                   </span>
-                  <span className="text-[10px] font-bold text-stone-600">sec</span>
+                  <span className="text-[10px] font-bold text-stone-600">
+                    {observationTimeLeft >= 60 ? (lang === 'uz' ? 'daq' : 'min') : (lang === 'uz' ? 'son' : 'sec')}
+                  </span>
                 </div>
 
                 <div>
@@ -756,7 +792,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
                     key={iss.id}
                     title={iss.title}
                     subtitle={dict.observedItemSubtitle.replace('{number}', iss.number)}
-                    badge={topPriorityId === iss.id ? dict.activePriorityBadge : 'Option'}
+                    badge={topPriorityId === iss.id ? dict.activePriorityBadge : (dict.optionBadge || 'Option')}
                     isSelected={topPriorityId === iss.id}
                     onSelect={() => setTopPriorityId(iss.id)}
                     onClick={() => setTopPriorityId(iss.id)}
@@ -910,10 +946,22 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
               }}
               scenario={scenario}
               onRestart={handleStartOver}
+              onViewCommunityResponses={() => setCurrentStep('community-responses')}
               theme="herbarium"
               lang={lang}
             />
           </div>
+        )}
+
+        {/* =========================================================================
+            PHASE 6: COMMUNITY ECO-AUDIT RESPONSES WALL ("See Others' Answers")
+            ========================================================================= */}
+        {currentStep === 'community-responses' && (
+          <CommunityResponsesView
+            onBackToCertificate={lastSubmission ? () => setCurrentStep('certificate') : () => setCurrentStep('gate')}
+            onStartNewAudit={handleStartOver}
+            lang={lang}
+          />
         )}
 
       </main>
@@ -940,8 +988,8 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
             </div>
             
             <div className="aspect-[16/10] bg-stone-950 rounded-lg overflow-hidden flex items-center justify-center">
-              {scenario.customImageUrl ? (
-                <img src={scenario.customImageUrl} alt={scenario.title} className="w-full h-full object-cover" />
+              {scenario.customImageUrl || scenario.coverImage ? (
+                <img src={scenario.customImageUrl || scenario.coverImage} alt={scenario.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="p-6 text-center text-stone-200">
                   <span className="text-5xl">🏛️</span>
@@ -957,7 +1005,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
                 onClick={() => setShowSceneModal(false)}
                 className="px-4 py-2 rounded-xl bg-stone-800 text-white text-xs font-bold hover:bg-stone-700 cursor-pointer"
               >
-                Close
+                {dict.closeBtn || (lang === 'uz' ? 'Yopish' : 'Close')}
               </button>
             </div>
           </div>

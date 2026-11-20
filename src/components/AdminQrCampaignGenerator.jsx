@@ -9,25 +9,29 @@ import BespokeButton from './design-system/BespokeButton';
 import BespokeInput from './design-system/BespokeInput';
 
 const CATEGORY_PRESETS = [
-  { id: 'classroom', nameEn: 'Classroom', nameUz: 'Sinfxona', defaultScenario: 'school' },
-  { id: 'cafeteria', nameEn: 'Cafeteria & Canteen', nameUz: 'Oshxona / Bufet', defaultScenario: 'cafeteria' },
-  { id: 'science-lab', nameEn: 'Science Laboratory', nameUz: 'Kimyo / Biologiya laboratoriyasi', defaultScenario: 'science-lab' },
-  { id: 'computer-lab', nameEn: 'Computer & IT Lab', nameUz: 'Informatika / IT xonasi', defaultScenario: 'computer-lab' },
-  { id: 'library', nameEn: 'Library & Study Hall', nameUz: 'Kutubxona / O\'quv zali', defaultScenario: 'library' },
-  { id: 'hallway', nameEn: 'Corridors & Hallways', nameUz: 'Yo\'laklar va Foye', defaultScenario: 'school' },
-  { id: 'restrooms', nameEn: 'Restrooms & Water Station', nameUz: 'Suv nuqtalari / Hojatxona', defaultScenario: 'restroom' },
-  { id: 'outdoors', nameEn: 'School Yard & Garden', nameUz: 'Maktab hovlisi / Bog\'', defaultScenario: 'grounds' }
+  { id: 'classroom', nameEn: 'Classroom & Hallway', nameUz: 'Maktab Sinfxonasi va Yo‘lak', defaultScenario: 'school' },
+  { id: 'office', nameEn: 'Workplace & Staff Office', nameUz: 'Xodimlar va Ma’muriy Xona', defaultScenario: 'office' },
+  { id: 'cafeteria', nameEn: 'Cafeteria & Canteen', nameUz: 'Maktab Oshxonasi va Bufet', defaultScenario: 'cafeteria' },
+  { id: 'science-lab', nameEn: 'Science Laboratory', nameUz: 'Kimyo va Biologiya Laboratoriyasi', defaultScenario: 'science-lab' },
+  { id: 'library', nameEn: 'Library & Study Hall', nameUz: 'Kutubxona va O‘quv Zali', defaultScenario: 'library' },
+  { id: 'restrooms', nameEn: 'Restrooms & Washrooms', nameUz: 'Hojatxona va Yuvinish Xonasi', defaultScenario: 'restroom' },
+  { id: 'gym', nameEn: 'Gymnasium & Sports Arena', nameUz: 'Sport Zali va Kiyinish Xonasi', defaultScenario: 'gym' },
+  { id: 'computer-lab', nameEn: 'Computer & IT Suite', nameUz: 'Informatika Xonasi va Server', defaultScenario: 'computer-lab' },
+  { id: 'garden', nameEn: 'Campus Garden & Greenhouse', nameUz: 'Maktab Bog‘i va Issiqxona', defaultScenario: 'garden' },
+  { id: 'grounds', nameEn: 'School Entrance & Grounds', nameUz: 'Maktab Kirish Qismi va Hovli', defaultScenario: 'grounds' }
 ];
 
 const PART_PRESETS = {
-  classroom: ['Radiators & Windows Zone', 'Teacher Desk & Charging Strips', 'Lighting & Door Drafts', 'Waste Bin & Paper Station'],
-  cafeteria: ['Tray Clearing & Waste Sorting', 'Cutlery & Napkin Station', 'Vending Machines & Coolers', 'Dishwashing & Faucet Area'],
-  'science-lab': ['Fume Hoods & Gas Taps', 'Chemical Storage Cabinet', 'Water Faucets & Sinks', 'Apparatus Power Strip'],
-  'computer-lab': ['Laptop Charging Trolley', 'Central Printer & Copier', 'Air Conditioning & Ventilation', 'Unattended Desktop Terminals'],
-  library: ['Window Study Desks', 'Main Chandelier / Spotlights', 'Book Binding & Paper Disposal', 'Librarian Counter'],
-  hallway: ['Locker Bank & Waste Bins', 'Hallway Radiator Bank', 'Exit Door Draft Seals', 'Emergency Lighting'],
-  restrooms: ['Washbasin Sensor Faucets', 'Hand Dryer / Paper Towel', 'Flushing Cisterns', 'Ceiling Ventilation'],
-  outdoors: ['Bicycle Parking Rack', 'Compost & Garden Bed', 'Perimeter Water Hose Tap', 'Outdoor Litter Bins']
+  classroom: ['Radiator & Window Zone', 'Teacher Desk & Charging Strips', 'Lighting & Door Drafts', 'Waste Bin & Paper Station'],
+  office: ['Computer Workstations', 'Coffee Station & Mugs', 'Air Conditioning & Desk Heater', 'General Trash Sorting'],
+  cafeteria: ['Tray Return & Food Waste', 'Cutlery & Napkin Dispenser', 'Dishwashing Spray Sink', 'Dining Hall High Lights'],
+  'science-lab': ['Chemical Fume Hood Sash', 'Prep Room Sink Faucet', 'Apparatus Power Strips', 'Specimen Cabinets'],
+  library: ['Window Study Carrels', 'Reading Desk Lamps', 'Archival Paper Recycling', 'Book Stacks Lighting'],
+  restrooms: ['Flushing Cistern Cubicles', 'Handwash Faucet Basins', 'Paper Towel Dispensers', 'Ceiling Ventilation & Lighting'],
+  gym: ['High-Bay Arena Floodlights', 'Locker Room Showers', 'Bleachers & Water Bottles', 'Equipment Storage Room'],
+  'computer-lab': ['30 Desktop Terminals', 'Split Air Conditioner & Door', 'Central Copier/Printer', 'Network Server Rack'],
+  garden: ['Irrigation Hose & Tap', 'Raised Vegetable Planter Beds', 'Compost & Organic Pile', 'Greenhouse Ventilation'],
+  grounds: ['Drop-off Vehicle Idling Zone', 'Midday Security Spotlights', 'Perimeter Trash Cans', 'Main Arrival Gate']
 };
 
 export default function AdminQrCampaignGenerator() {
