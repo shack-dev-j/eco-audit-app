@@ -45,8 +45,8 @@ const PART_PRESETS = {
 export default function AdminQrCampaignGenerator() {
   // Host resolution: detect network IP, current window origin, or default
   const defaultHost = typeof window !== 'undefined' 
-    ? (window.location.hostname === 'localhost' ? 'http://192.168.0.203:5173' : window.location.origin)
-    : 'http://192.168.0.203:5173';
+    ? (window.location.hostname === 'localhost' ? 'http://10.252.149.101:5173' : window.location.origin)
+    : 'http://10.252.149.101:5173';
 
   const [hostUrl, setHostUrl] = useState(defaultHost);
   const [selectedCategory, setSelectedCategory] = useState('classroom');
@@ -338,15 +338,39 @@ export default function AdminQrCampaignGenerator() {
               </button>
             </div>
 
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+              <button
+                type="button"
+                onClick={() => setHostUrl('http://10.252.149.101:5173')}
+                className="px-2 py-0.5 rounded text-[10px] bg-emerald-950 border border-emerald-600/50 text-emerald-300 hover:bg-emerald-900 cursor-pointer"
+              >
+                📡 Wi-Fi IP (10.252.149.101:5173)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHostUrl('https://eco-audit-app.vercel.app')}
+                className="px-2 py-0.5 rounded text-[10px] bg-cyan-950 border border-cyan-600/50 text-cyan-300 hover:bg-cyan-900 cursor-pointer"
+              >
+                ☁️ Vercel (eco-audit-app.vercel.app)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHostUrl(typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')}
+                className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700 cursor-pointer"
+              >
+                🌐 Brauzer manzili ({typeof window !== 'undefined' ? window.location.origin : 'Current'})
+              </button>
+            </div>
+
             <input
               type="text"
               value={hostUrl}
               onChange={(e) => setHostUrl(e.target.value)}
-              placeholder="e.g., http://192.168.0.203:5173 or https://my-audit.vercel.app"
+              placeholder="e.g., http://10.252.149.101:5173 or https://eco-audit-app.vercel.app"
               className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-emerald-700/40 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             <p className="text-[11px] text-slate-400">
-              Testers on mobile phones connect via your LAN Wi-Fi IP (e.g. <code>http://192.168.0.203:5173</code>) or your live Vercel URL once deployed.
+              Telefon va planshetlar ulangan Wi-Fi IP (masalan <code>http://10.252.149.101:5173</code>) yoki rasmiy Vercel bulut manzili orqali skanerlaydi.
             </p>
           </div>
 
