@@ -21,15 +21,18 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = 4000) => {
   }
 };
 
+const DEFAULT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbykoyQc6B2VBfNqWxCQuJmN7zaosKx9GZdT6h4I3Ea-evurK6li0Oo_zfMp-5iPVESc/exec';
+
 export const getBackendSettings = () => {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    return raw ? JSON.parse(raw) : {
+    const parsed = raw ? JSON.parse(raw) : {};
+    return {
       method: 'google_sheets', // 'local_only' | 'local_plus_email' | 'google_sheets' | 'custom_webhook'
-      recipientEmail: 'ecology.committee@school.edu',
-      formspreeEndpoint: '',
-      web3FormsKey: '',
-      googleSheetWebhookUrl: ''
+      recipientEmail: parsed.recipientEmail || 'ecology.committee@school.edu',
+      formspreeEndpoint: parsed.formspreeEndpoint || '',
+      web3FormsKey: parsed.web3FormsKey || '',
+      googleSheetWebhookUrl: parsed.googleSheetWebhookUrl || DEFAULT_WEBHOOK_URL
     };
   } catch {
     return {
@@ -37,7 +40,7 @@ export const getBackendSettings = () => {
       recipientEmail: 'ecology.committee@school.edu',
       formspreeEndpoint: '',
       web3FormsKey: '',
-      googleSheetWebhookUrl: ''
+      googleSheetWebhookUrl: DEFAULT_WEBHOOK_URL
     };
   }
 };

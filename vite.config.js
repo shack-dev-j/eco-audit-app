@@ -22,7 +22,7 @@ function submissionApiPlugin() {
     recipientEmail: 'ecology.committee@school.edu',
     formspreeEndpoint: '',
     web3FormsKey: '',
-    googleSheetWebhookUrl: ''
+    googleSheetWebhookUrl: 'https://script.google.com/macros/s/AKfycbykoyQc6B2VBfNqWxCQuJmN7zaosKx9GZdT6h4I3Ea-evurK6li0Oo_zfMp-5iPVESc/exec'
   };
 
   const ensureStorage = () => {

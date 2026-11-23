@@ -180,7 +180,7 @@ export default async function handler(req, res) {
 
     // Forward to Google Sheet Webhook if configured in central settings
     try {
-      let webhookUrl = null;
+      let webhookUrl = 'https://script.google.com/macros/s/AKfycbykoyQc6B2VBfNqWxCQuJmN7zaosKx9GZdT6h4I3Ea-evurK6li0Oo_zfMp-5iPVESc/exec';
       const settingsTmp = path.join('/tmp', 'eco_audit_backend_settings.json');
       if (fs.existsSync(settingsTmp)) {
         const s = JSON.parse(fs.readFileSync(settingsTmp, 'utf-8'));
