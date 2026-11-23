@@ -51,25 +51,50 @@ export default function FacilitatorHub({
     setTimeout(() => setSavedConfig(false), 2000);
   };
 
-  const googleAppsScriptCode = `// 1. In Google Sheets: Extensions > Apps Script
-// 2. Paste this code and Deploy > New Deployment > Web App
-// 3. Set "Who has access" to "Anyone"
+  const googleAppsScriptCode = `// 1. In your Google Sheet: click Extensions > Apps Script
+// 2. Delete any existing code, paste this script, and click "Save"
+// 3. Click "Deploy" > "New deployment" > Select type: "Web app"
+// 4. Set "Execute as": "Me" & "Who has access": "Anyone"
+// 5. Click "Deploy", copy the Web App URL, and paste it below!
+
 function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      "Timestamp", "Participant Name", "Role", "Scenario", 
+      "Venue Zone", "Specific Spot", "Spotted Issues", 
+      "Top Priority Target", "Priority Rationale", 
+      "Practical Action Pledge", "Resolution Horizon"
+    ]);
+    sheet.getRange(1, 1, 1, 11).setFontWeight("bold").setBackground("#d4edda");
+  }
+
   var data = JSON.parse(e.postData.contents);
+  var issues = data.selectedIssues ? data.selectedIssues.map(function(i){ 
+    return typeof i === 'string' ? i : (i.title || ''); 
+  }).join('; ') : '';
+
   sheet.appendRow([
     new Date(),
     data.participantName || 'Anonymous',
-    data.participantEmail || '',
     data.participantRole || 'Student',
     data.scenarioTitle || '',
-    data.selectedIssues ? data.selectedIssues.map(function(i){ return i.title; }).join('; ') : '',
+    data.venueCategory || '',
+    data.venueSpecificSpot || '',
+    issues,
     data.topPriorityTitle || '',
     data.priorityReason || '',
     data.practicalAction || '',
     data.timeToFix || ''
   ]);
-  return ContentService.createTextOutput(JSON.stringify({result: "success"}))
+
+  return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ status: "Eco-Audit Webhook Active" }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
 
