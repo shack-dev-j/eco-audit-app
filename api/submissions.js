@@ -178,6 +178,23 @@ export default async function handler(req, res) {
     const updated = [enriched, ...current.filter(item => item && item.id !== enriched.id)];
     await saveToGist(updated);
 
+    // Forward to Google Sheet Webhook if configured in central settings
+    try {
+      let webhookUrl = null;
+      const settingsTmp = path.join('/tmp', 'eco_audit_backend_settings.json');
+      if (fs.existsSync(settingsTmp)) {
+        const s = JSON.parse(fs.readFileSync(settingsTmp, 'utf-8'));
+        if (s && s.googleSheetWebhookUrl) webhookUrl = s.googleSheetWebhookUrl;
+      }
+      if (webhookUrl && webhookUrl.startsWith('http')) {
+        fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(enriched)
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
     return res.status(201).json({
       success: true,
       submission: enriched

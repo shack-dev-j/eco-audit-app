@@ -1,0 +1,7 @@
+{
+  "method": "google_sheets",
+  "recipientEmail": "ecology.committee@school.edu",
+  "formspreeEndpoint": "",
+  "web3FormsKey": "",
+  "googleSheetWebhookUrl": ""
+}

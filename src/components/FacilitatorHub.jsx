@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, CheckSquare, MessageSquare, Download, Users, 
   HelpCircle, Sparkles, ChevronRight, CheckCircle2, ShieldAlert,
   Database, Mail, FileSpreadsheet, Copy, Check, Send
 } from 'lucide-react';
 import { SCENARIOS, DEBRIEF_QUESTIONS, FACILITATOR_CLOSING_LINE } from '../data/scenarios';
-import { getBackendSettings, saveBackendSettings, generateMailtoUrl } from '../services/submissionService';
+import { getBackendSettings, saveBackendSettings, fetchBackendSettings, generateMailtoUrl } from '../services/submissionService';
 import BespokeInput from './design-system/BespokeInput';
 import BespokeButton from './design-system/BespokeButton';
 
@@ -18,6 +18,12 @@ export default function FacilitatorHub({
   const [backendConfig, setBackendConfig] = useState(getBackendSettings());
   const [savedConfig, setSavedConfig] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
+
+  useEffect(() => {
+    fetchBackendSettings().then(remote => {
+      if (remote) setBackendConfig(remote);
+    });
+  }, []);
 
   const exportSubmissionsCSV = () => {
     if (!submissions.length) return;

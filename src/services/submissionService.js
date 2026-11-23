@@ -42,11 +42,101 @@ export const getBackendSettings = () => {
   }
 };
 
+/**
+ * Fetch remote backend settings from server and synchronize with localStorage.
+ */
+export const fetchBackendSettings = async () => {
+  try {
+    const res = await fetchWithTimeout('/api/settings', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    }, 3500);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && data.settings) {
+        const local = getBackendSettings();
+        const merged = { ...local, ...data.settings };
+        // If local has a webhook url and server was empty, keep local
+        if (local.googleSheetWebhookUrl && !data.settings.googleSheetWebhookUrl) {
+          merged.googleSheetWebhookUrl = local.googleSheetWebhookUrl;
+        }
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+        return merged;
+      }
+    }
+  } catch (_) {}
+  return getBackendSettings();
+};
+
 export const saveBackendSettings = (settings) => {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch (err) {
     console.warn('Failed to save backend settings to localStorage:', err);
+  }
+
+  // Also synchronize to the central server so all mobile devices forward to Google Sheets
+  try {
+    fetchWithTimeout('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(settings)
+    }, 4000).catch(() => {});
+  } catch (_) {}
+};
+
+/**
+ * Send a live test diagnostic row to the Google Apps Script Web App
+ */
+export const testGoogleSheetWebhook = async (webhookUrl) => {
+  const targetUrl = webhookUrl || getBackendSettings().googleSheetWebhookUrl;
+  if (!targetUrl || typeof targetUrl !== 'string' || !targetUrl.startsWith('http')) {
+    return { success: false, error: 'Havola kiritilmagan yoki noto‘g‘ri formatda.' };
+  }
+
+  // Try via server test endpoint first (bypasses browser CORS restrictions)
+  try {
+    const res = await fetchWithTimeout('/api/test-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ url: targetUrl })
+    }, 8000);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      return data;
+    }
+  } catch (_) {}
+
+  // Fallback: direct browser fetch
+  try {
+    const testPayload = {
+      participantName: "Eco-Audit Test",
+      participantRole: "Administrator",
+      scenarioTitle: "Google Sheet Ulanish Testi",
+      venueCategory: "Nazorat Xonasi",
+      venueSpecificSpot: "Asosiy Ekran",
+      selectedIssues: ["Webhook Ulanishini Tekshirish"],
+      topPriorityTitle: "Jonli Sinxronizatsiya O‘rnatildi",
+      priorityReason: "Barcha qurilmalardan javoblar Google Jadvalga tushishini tasdiqlash",
+      practicalAction: "Webhook muvaffaqiyatli ulandi va faollashtirildi",
+      timeToFix: "Darhol"
+    };
+
+    await fetch(targetUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testPayload)
+    });
+
+    return { 
+      success: true, 
+      message: "Test so‘rov Google Jadvalga yuborildi! Iltimos, Google Sheet jadvalingizni tekshiring." 
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 };
 
