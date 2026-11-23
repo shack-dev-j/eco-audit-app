@@ -71,22 +71,7 @@ async function fetchFromGist() {
     }
   }
 
-  // 2. Fallback: Public raw Gist URL
-  try {
-    const rawRes = await fetch(`https://gist.githubusercontent.com/shack-dev-j/${GIST_ID}/raw/submissions.json?t=${Date.now()}`);
-    if (rawRes.ok) {
-      const parsed = await rawRes.json();
-      if (Array.isArray(parsed)) {
-        memoryCache = { data: parsed, timestamp: Date.now() };
-        saveToTmp(parsed);
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Raw Gist fetch error:', err);
-  }
-
-  // 3. Fallback: local /tmp
+  // 2. Fallback: local /tmp
   const tmpData = loadFromTmp();
   memoryCache = { data: tmpData, timestamp: Date.now() };
   return tmpData;
@@ -201,6 +186,10 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     await saveToGist([]);
+    try {
+      if (fs.existsSync(TMP_FILE)) fs.unlinkSync(TMP_FILE);
+    } catch (_) {}
+    memoryCache = { data: [], timestamp: Date.now() };
     return res.status(200).json({
       success: true,
       count: 0,
