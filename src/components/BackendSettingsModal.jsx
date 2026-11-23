@@ -105,7 +105,13 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var SPREADSHEET_ID = "194Ni2OjaCH1klhc0WvWaV2SKAErX_FziycC6CcPbKxE";
+    var sheet;
+    try {
+      sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getActiveSheet();
+    } catch (_) {
+      sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    }
     
     // 2. Auto-create styled header row if sheet is brand new
     if (sheet.getLastRow() === 0) {
@@ -201,6 +207,7 @@ function testDoPost() {
   };
 
   const isEditorUrl = settings.googleSheetWebhookUrl && settings.googleSheetWebhookUrl.includes('/projects/');
+  const isSpreadsheetUrl = settings.googleSheetWebhookUrl && settings.googleSheetWebhookUrl.includes('docs.google.com/spreadsheets');
   const isValidExecUrl = settings.googleSheetWebhookUrl && settings.googleSheetWebhookUrl.includes('/exec');
 
   return (
@@ -267,6 +274,21 @@ function testDoPost() {
             />
 
             {/* URL Validation Warnings */}
+            {isSpreadsheetUrl && (
+              <div className="p-3.5 rounded-2xl bg-amber-950/70 border-2 border-amber-500/70 flex items-start gap-2.5 text-xs text-amber-200 animate-in fade-in">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <strong className="text-amber-300 block font-bold text-sm">Diqqat: Siz Google Sheet jadvalining o‘zini havolasini kiritgansiz!</strong>
+                  <p>
+                    Kiritilgan havola: <code className="bg-black/40 px-1 py-0.5 rounded text-[11px] text-amber-100 break-all">{settings.googleSheetWebhookUrl}</code>
+                  </p>
+                  <p>
+                    Jadvalning o‘zi to‘g‘ridan-to‘g‘ri ma'lumot qabul qila olmaydi. Bu yerga Google Apps Script oynasidagi <strong>Deploy &gt; New deployment</strong> orqali beriladigan <strong>Web app URL</strong> (u <code>/exec</code> bilan tugaydi) qo‘yilishi kerak!
+                  </p>
+                </div>
+              </div>
+            )}
+
             {isEditorUrl && (
               <div className="p-3 rounded-2xl bg-amber-950/60 border border-amber-500/50 flex items-start gap-2.5 text-xs text-amber-200">
                 <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
