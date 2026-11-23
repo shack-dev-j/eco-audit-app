@@ -185,7 +185,7 @@ describe('4. Form Submission Lifecycle & Data Integrity Suite', () => {
       expect(enriched.status).toBe('synced_remote');
     });
 
-    it('fetches remote submissions from /api/submissions and merges with local storage without duplicates', async () => {
+    it('loads shared submissions without mixing in stale browser entries', async () => {
       const remoteMockData = [
         {
           id: 'audit-remote-101',
@@ -221,9 +221,33 @@ describe('4. Form Submission Lifecycle & Data Integrity Suite', () => {
         '/api/submissions',
         expect.objectContaining({ method: 'GET' })
       );
-      expect(merged).toHaveLength(2);
+      expect(merged).toHaveLength(1);
       expect(merged.some(s => s.id === 'audit-remote-101')).toBe(true);
-      expect(merged.some(s => s.id === 'audit-local-202')).toBe(true);
+      expect(merged.some(s => s.id === 'audit-local-202')).toBe(false);
+    });
+
+    it('keeps a cleared shared list empty even with stale browser data', async () => {
+      localStorage.setItem('eco_audit_submissions', JSON.stringify([{ id: 'old-sample' }]));
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, submissions: [] })
+      });
+      global.fetch = mockFetch;
+
+      await expect(fetchRemoteSubmissions()).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a failed clear and preserves browser data', async () => {
+      const cached = JSON.stringify([{ id: 'old-sample' }]);
+      localStorage.setItem('eco_audit_submissions', cached);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ success: false, error: 'Shared storage is unavailable.' })
+      });
+
+      await expect(clearSubmissions()).rejects.toThrow('Shared storage is unavailable.');
+      expect(localStorage.getItem('eco_audit_submissions')).toBe(cached);
     });
 
     it('clears remote server storage on clearSubmissions', async () => {

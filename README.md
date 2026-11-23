@@ -36,7 +36,15 @@ This repository is pre-configured for instant deployment on [Vercel](https://ver
 1. Click the **Deploy** button above or go to [vercel.com/new](https://vercel.com/new).
 2. Select and import **`shack-dev-j/eco-audit-app`**.
 3. Leave default settings (Framework Preset: **Vite**, Build Command: `vite build`, Output Directory: `dist`).
-4. Click **Deploy**.
+4. Configure these server-side environment variables, then click **Deploy**.
+
+| Variable | Value |
+| --- | --- |
+| `GIST_ID` | ID of the private (secret) Gist used for shared submissions. Use the existing Gist ID to keep stored responses. |
+| `GIST_TOKEN` | GitHub token with permission to edit that Gist. |
+| `ADMIN_CLEAR_KEY` | A secret you choose and enter when confirming Clear on the deployed admin page. |
+
+The deployment reads and writes `submissions.json` in the configured Gist. For a new Gist, initialize that file with `[]`. On a LAN, all devices should open the same Vite server. That server uses its own `data/submissions.json`.
 
 Vercel will build the frontend into `dist/` and automatically deploy `/api/submissions` as a serverless endpoint.
 Any new commit pushed to the `main` branch will automatically trigger a production redeployment.

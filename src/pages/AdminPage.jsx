@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { 
   Database, QrCode, BookOpen, Camera, CheckCircle2, 
   Palette, Download, Trash2, ArrowUpRight, Search, 
@@ -15,7 +15,7 @@ import ScenarioPictureCard from '../components/ScenarioPictureCard';
 import AdminQrCampaignGenerator from '../components/AdminQrCampaignGenerator';
 import AdminQuestionEditor from '../components/AdminQuestionEditor';
 import { SCENARIOS } from '../data/scenarios';
-import { getLocalSubmissions, fetchRemoteSubmissions, clearSubmissions } from '../services/submissionService';
+import { fetchRemoteSubmissions, clearSubmissions } from '../services/submissionService';
 import { sounds } from '../services/soundEffects';
 
 /**
@@ -37,11 +37,17 @@ export default function AdminPage({
   const [customPhotoModalOpen, setCustomPhotoModalOpen] = useState(false);
 
   // Submissions Log & Live Remote Synchronization
-  const [submissions, setSubmissions] = useState(() => getLocalSubmissions());
+  const [submissions, setSubmissions] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
-  const [syncStatus, setSyncStatus] = useState('active'); // 'active' | 'syncing' | 'offline'
+  const [syncStatus, setSyncStatus] = useState('loading');
+  const [clearError, setClearError] = useState('');
+  const [isClearing, setIsClearing] = useState(false);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const requestVersion = useRef(0);
+  const clearing = useRef(false);
+  const loading = useRef(false);
 
   // Modals
   const [posterScenario, setPosterScenario] = useState(null);
@@ -49,56 +55,39 @@ export default function AdminPage({
 
   const currentScenario = scenariosList.find(s => s.id === selectedScenarioId) || scenariosList[0];
 
-  const loadSubmissions = async (silent = false) => {
-    if (!silent) setIsSyncing(true);
+  const loadSubmissions = useCallback(async () => {
+    if (clearing.current || loading.current) return;
+    loading.current = true;
+    const version = ++requestVersion.current;
+    setIsSyncing(true);
     try {
-      const merged = await fetchRemoteSubmissions();
-      setSubmissions(merged);
+      const latest = await fetchRemoteSubmissions();
+      if (version !== requestVersion.current) return;
+      setSubmissions(latest);
       setSyncStatus('active');
       setLastSyncTime(new Date());
-    } catch (err) {
-      console.warn('Submissions sync error:', err);
-      setSyncStatus('offline');
+    } catch {
+      if (version === requestVersion.current) setSyncStatus('offline');
     } finally {
-      if (!silent) setIsSyncing(false);
+      if (version === requestVersion.current) {
+        loading.current = false;
+        setIsSyncing(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const load = async (silent = false) => {
-      if (!silent && isMounted) setIsSyncing(true);
-      try {
-        const merged = await fetchRemoteSubmissions();
-        if (isMounted) {
-          setSubmissions(merged);
-          setSyncStatus('active');
-          setLastSyncTime(new Date());
-        }
-      } catch (err) {
-        console.warn('Submissions sync error:', err);
-        if (isMounted) setSyncStatus('offline');
-      } finally {
-        if (!silent && isMounted) setIsSyncing(false);
-      }
-    };
-
-    load();
-    // Poll every 4 seconds for live incoming mobile submissions over local Wi-Fi / LAN
+    loadSubmissions();
     const interval = setInterval(() => {
-      load(true);
+      loadSubmissions();
     }, 4000);
 
     return () => {
-      isMounted = false;
+      requestVersion.current++;
+      loading.current = false;
       clearInterval(interval);
     };
-  }, []);
-
-  const handleRefreshSubmissions = async () => {
-    await loadSubmissions(false);
-  };
+  }, [loadSubmissions]);
 
   const handleToggleMute = () => {
     const muted = sounds.toggleMute();
@@ -163,10 +152,36 @@ export default function AdminPage({
   };
 
   const handleClearAll = async () => {
-    if (window.confirm('Are you sure you want to clear all recorded submissions from both local and remote server storage? / Barcha auditlarni tozalashga ishonchingiz komilmi?')) {
-      await clearSubmissions();
+    if (clearing.current || !window.confirm('Permanently clear all shared audit submissions?')) return;
+    const key = import.meta.env.PROD ? window.prompt('Enter the admin clear key. Leave blank for a local LAN server.') : '';
+    if (key === null) return;
+    clearing.current = true;
+    requestVersion.current++;
+    loading.current = false;
+    setIsSyncing(false);
+    setIsClearing(true);
+    setClearError('');
+    try {
+      await clearSubmissions(key);
       setSubmissions([]);
+      setExpandedIds(new Set());
+      setSyncStatus('active');
+      setLastSyncTime(new Date());
+    } catch (error) {
+      setClearError(error.message);
+    } finally {
+      clearing.current = false;
+      setIsClearing(false);
     }
+  };
+
+  const toggleAnswers = (id) => {
+    setExpandedIds(previous => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const filteredSubmissions = submissions.filter(s => {
@@ -440,7 +455,7 @@ export default function AdminPage({
                   </span>
                   <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${syncStatus === 'active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
                     <span className={`w-2 h-2 rounded-full ${syncStatus === 'active' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-                    {syncStatus === 'active' ? 'Faol / Live' : 'Oflayn / Local'}
+                    {({ active: 'Faol / Live', loading: 'Connecting…', offline: 'Shared storage unavailable' })[syncStatus]}
                   </span>
                 </div>
                 <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -472,7 +487,8 @@ export default function AdminPage({
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <button
-                  onClick={handleRefreshSubmissions}
+                  onClick={loadSubmissions}
+                  disabled={isSyncing || isClearing}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors cursor-pointer"
                   title="Reload submissions from storage and server"
                 >
@@ -492,15 +508,18 @@ export default function AdminPage({
                 {submissions.length > 0 && (
                   <button
                     onClick={handleClearAll}
+                    disabled={isClearing}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/60 hover:bg-red-900 text-xs font-bold text-red-300 border border-red-800/40 transition-colors cursor-pointer"
                     title="Clear submissions"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Clear</span>
+                    <span>{isClearing ? 'Clearing…' : 'Clear'}</span>
                   </button>
                 )}
               </div>
             </div>
+
+            {clearError && <p role="alert" className="text-sm text-red-300">{clearError}</p>}
 
             {/* Submissions Table */}
             <div className="eco-card overflow-hidden">
@@ -508,7 +527,7 @@ export default function AdminPage({
                 <div className="p-8 text-center text-slate-400 space-y-2">
                   <span className="text-3xl block">📋</span>
                   <div className="text-sm font-bold text-slate-300">
-                    No submissions recorded yet
+                    {syncStatus === 'offline' ? 'Unable to load submissions' : syncStatus === 'loading' ? 'Loading submissions…' : searchQuery ? 'No matching submissions' : 'No submissions recorded yet'}
                   </div>
                   <p className="text-xs text-slate-500 max-w-md mx-auto">
                     When respondents scan the stand QR code or complete the survey form at <code>/</code>, their audited findings, priorities, and action pledges will appear here live.
@@ -519,6 +538,7 @@ export default function AdminPage({
                   <table className="w-full text-left text-xs text-slate-200">
                     <thead className="bg-slate-900/90 text-emerald-400 uppercase tracking-wider text-[10px] font-extrabold border-b border-emerald-800/40">
                       <tr>
+                        <th className="p-3">Answers</th>
                         <th className="p-3">Source</th>
                         <th className="p-3">Participant</th>
                         <th className="p-3">Role</th>
@@ -532,54 +552,101 @@ export default function AdminPage({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-emerald-900/30">
-                      {filteredSubmissions.map((sub, idx) => (
-                        <tr key={sub.id || idx} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="p-3 whitespace-nowrap">
-                            {sub.origin === 'remote_mobile' || sub.status === 'synced_remote' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-700/50" title="Submitted over WiFi/Network">
-                                <span>📱</span>
-                                <span>Masofaviy</span>
+                      {filteredSubmissions.map((sub, idx) => {
+                        const key = sub.id || idx;
+                        const expanded = expandedIds.has(key);
+                        const detailsId = `submission-answers-${idx}`;
+                        const issues = Array.isArray(sub.selectedIssues)
+                          ? sub.selectedIssues.map(issue => typeof issue === 'string' ? issue : issue?.title).filter(Boolean)
+                          : [];
+                        return (
+                          <Fragment key={key}>
+                          <tr className="hover:bg-slate-800/40 transition-colors">
+                            <td className="p-3">
+                              <button
+                                type="button"
+                                aria-expanded={expanded}
+                                aria-controls={detailsId}
+                                aria-label={`${expanded ? 'Hide' : 'View'} answers for ${sub.participantName || 'Anonymous'}`}
+                                onClick={() => toggleAnswers(key)}
+                                className="whitespace-nowrap rounded-lg bg-emerald-900 px-3 py-2 font-bold text-emerald-100 hover:bg-emerald-800"
+                              >
+                                {expanded ? 'Hide answers' : 'View answers'}
+                              </button>
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              {sub.origin === 'remote_mobile' || sub.status === 'synced_remote' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-700/50" title="Submitted over WiFi/Network">
+                                  <span>📱</span>
+                                  <span>Masofaviy</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700" title="Local browser entry">
+                                  <span>💻</span>
+                                  <span>Lokal</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 font-bold text-white whitespace-nowrap">
+                              {sub.participantName || 'Anonymous'}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/50">
+                                {sub.participantRole || 'Student'}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700" title="Local browser entry">
-                                <span>💻</span>
-                                <span>Lokal</span>
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                                {sub.language === 'uz' ? '🇺🇿 UZ' : '🇬🇧 EN'}
                               </span>
-                            )}
-                          </td>
-                          <td className="p-3 font-bold text-white whitespace-nowrap">
-                            {sub.participantName || 'Anonymous'}
-                          </td>
-                          <td className="p-3 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/50">
-                              {sub.participantRole || 'Student'}
-                            </span>
-                          </td>
-                          <td className="p-3 whitespace-nowrap">
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                              {sub.language === 'uz' ? '🇺🇿 UZ' : '🇬🇧 EN'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-300 whitespace-nowrap">
-                            {sub.venueCategory || sub.scenarioTitle}
-                          </td>
-                          <td className="p-3 text-cyan-300 font-bold whitespace-nowrap">
-                            {sub.venueSpecificSpot || 'General Area'}
-                          </td>
-                          <td className="p-3 font-bold text-amber-300 max-w-xs truncate">
-                            {sub.topPriorityTitle}
-                          </td>
-                          <td className="p-3 text-slate-300 max-w-xs truncate">
-                            {sub.practicalAction}
-                          </td>
-                          <td className="p-3 text-[11px] text-cyan-300 whitespace-nowrap">
-                            {sub.timeToFix || '< 24 hrs'}
-                          </td>
-                          <td className="p-3 text-slate-400 whitespace-nowrap">
-                            {sub.date}
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="p-3 text-slate-300 whitespace-nowrap">
+                              {sub.venueCategory || sub.scenarioTitle}
+                            </td>
+                            <td className="p-3 text-cyan-300 font-bold whitespace-nowrap">
+                              {sub.venueSpecificSpot || 'General Area'}
+                            </td>
+                            <td className="p-3 font-bold text-amber-300 max-w-xs truncate">
+                              {sub.topPriorityTitle}
+                            </td>
+                            <td className="p-3 text-slate-300 max-w-xs truncate">
+                              {sub.practicalAction}
+                            </td>
+                            <td className="p-3 text-[11px] text-cyan-300 whitespace-nowrap">
+                              {sub.timeToFix || '< 24 hrs'}
+                            </td>
+                            <td className="p-3 text-slate-400 whitespace-nowrap">
+                              {sub.date || sub.submittedAt?.slice(0, 10)}
+                            </td>
+                          </tr>
+                          <tr id={detailsId} hidden={!expanded}>
+                            <td colSpan={11} className="bg-slate-900/70 p-4">
+                              <dl className="grid gap-4 whitespace-pre-wrap break-words sm:grid-cols-2">
+                                <div>
+                                  <dt className="font-bold text-emerald-300">Issues noticed</dt>
+                                  <dd>{issues.length ? (
+                                    <ul className="list-disc pl-5">
+                                      {issues.map((issue, index) => <li key={index}>{issue}</li>)}
+                                    </ul>
+                                  ) : 'No issues recorded'}</dd>
+                                </div>
+                                {[
+                                  ['Top priority', sub.topPriorityTitle],
+                                  ['Reason for priority', sub.priorityReason],
+                                  ['Practical action pledge', sub.practicalAction],
+                                  ['Time to fix', sub.timeToFix]
+                                ].map(([label, answer]) => (
+                                  <div key={label}>
+                                    <dt className="font-bold text-emerald-300">{label}</dt>
+                                    <dd>{answer || 'No answer recorded'}</dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            </td>
+                          </tr>
+                          </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

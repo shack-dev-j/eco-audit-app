@@ -59,96 +59,33 @@ export const getLocalSubmissions = () => {
   }
 };
 
-/**
- * Fetch remote submissions from /api/submissions and merge with client-side localStorage.
- * Deduplicates by unique audit ID and sorts descending by timestamp.
- */
 export const fetchRemoteSubmissions = async () => {
-  let remoteSubmissions = [];
-  try {
-    const res = await fetchWithTimeout('/api/submissions', {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    }, 3500);
-
-    if (res && res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.submissions)) {
-        remoteSubmissions = data.submissions;
-      }
-    }
-  } catch (err) {
-    // Network offline or endpoint unreachable - fallback to local storage
+  const response = await fetchWithTimeout('/api/submissions', {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' }
+  }, 7000);
+  const data = response?.ok ? await response.json() : null;
+  if (!data?.success || !Array.isArray(data.submissions)) {
+    throw new Error('Shared submissions are unavailable.');
   }
 
-  // Fallback to public cloud Gist if /api/submissions yielded no items
-  if (remoteSubmissions.length === 0) {
-    try {
-      const rawGistUrl = 'https://gist.githubusercontent.com/shack-dev-j/393fca3786758541e1ffa25835329483/raw/submissions.json?t=' + Date.now();
-      const gistRes = await fetchWithTimeout(rawGistUrl, { method: 'GET', headers: { 'Accept': 'application/json' } }, 3000);
-      if (gistRes && gistRes.ok) {
-        const gistData = await gistRes.json();
-        if (Array.isArray(gistData) && gistData.length > 0) {
-          remoteSubmissions = gistData;
-        }
-      }
-    } catch (_) {}
-  }
-
-  const localItems = getLocalSubmissions();
-
-  // Merge map keyed by ID
-  const mergedMap = new Map();
-  // Remote items take precedence for server-validated state
-  remoteSubmissions.forEach(sub => {
-    if (sub && sub.id) mergedMap.set(sub.id, sub);
-  });
-  // Local items not yet synced are preserved
-  localItems.forEach(sub => {
-    if (sub && sub.id && !mergedMap.has(sub.id)) {
-      mergedMap.set(sub.id, sub);
-    }
-  });
-
-  const merged = Array.from(mergedMap.values());
-  // Sort descending by time
-  merged.sort((a, b) => new Date(b.submittedAt || b.date || 0) - new Date(a.submittedAt || a.date || 0));
-
-  // Sync merged back to local storage
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-  } catch (_) {}
-
-  // Background sync for any pending local items
-  const unsynced = localItems.filter(item => item && item.status !== 'synced_remote');
-  if (unsynced.length > 0) {
-    unsynced.forEach(item => {
-      fetchWithTimeout('/api/submissions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(item)
-      }, 3000).catch(() => {});
-    });
-  }
-
-  return merged;
+  return data.submissions.filter(item => item && typeof item === 'object')
+    .sort((a, b) => new Date(b.submittedAt || b.date || 0) - new Date(a.submittedAt || a.date || 0));
 };
 
-export const clearSubmissions = async () => {
+export const clearSubmissions = async (adminKey = '') => {
+  const headers = { Accept: 'application/json' };
+  if (adminKey) headers.Authorization = `Bearer ${adminKey}`;
+  const response = await fetchWithTimeout('/api/submissions', { method: 'DELETE', headers }, 8000);
+  const data = await response?.json().catch(() => null);
+  if (!response?.ok || !data?.success) {
+    throw new Error(data?.error || 'Could not clear shared submissions.');
+  }
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch (err) {
-    console.warn('LocalStorage clear failed:', err);
-  }
-
-  // Also clear remote server storage
-  try {
-    await fetchWithTimeout('/api/submissions', {
-      method: 'DELETE',
-      headers: { 'Accept': 'application/json' }
-    }, 3000);
-  } catch (err) {
-    console.warn('Remote submissions clear failed:', err);
+  } catch (error) {
+    console.warn('LocalStorage clear failed:', error);
   }
 };
 
@@ -178,9 +115,10 @@ export const saveSubmission = async (submission) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(enriched)
-    }, 4000);
+    }, 12000);
 
-    if (apiRes && (apiRes.ok || apiRes.status === 201)) {
+    const result = apiRes?.ok ? await apiRes.json() : null;
+    if (result?.success && result.submission?.id === enriched.id) {
       dispatchResults.remoteApi = true;
       enriched.status = 'synced_remote';
       // update local status

@@ -105,6 +105,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
   const [timeToFix, setTimeToFix] = useState('Immediate Quick Win (< 24 hrs)');
   const [validationError, setValidationError] = useState('');
   const [lastSubmission, setLastSubmission] = useState(null);
+  const [submissionSync, setSubmissionSync] = useState(null);
   const [showSceneModal, setShowSceneModal] = useState(false);
 
   // Read URL query parameters on initial mount
@@ -309,6 +310,7 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
     };
 
     setLastSubmission(payload);
+    setSubmissionSync({ id: payload.id, status: 'saving' });
     setCurrentStep('certificate');
 
     try {
@@ -320,7 +322,10 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
       });
     } catch (_) {}
 
-    await saveSubmission(payload);
+    const { dispatchResults } = await saveSubmission(payload);
+    setSubmissionSync(current => current?.id === payload.id
+      ? { id: payload.id, status: dispatchResults.remoteApi ? 'synced' : 'offline' }
+      : current);
   };
 
   // Shuffle to another random picture/scenario so every respondent can explore different scenes
@@ -979,6 +984,16 @@ export default function UserSurveyPage({ defaultScenarioId = 'school' }) {
             ========================================================================= */}
         {currentStep === 'certificate' && lastSubmission && (
           <div className="space-y-6 animate-in fade-in duration-500">
+            {submissionSync?.status === 'saving' && (
+              <p role="status" className="text-sm text-stone-700">
+                {lang === 'uz' ? 'Javob serverga yuborilmoqda…' : 'Sending your response to the shared server…'}
+              </p>
+            )}
+            {submissionSync?.status === 'offline' && (
+              <p role="alert" className="text-sm font-semibold text-red-900">
+                {lang === 'uz' ? 'Javob umumiy serverga yuborilmadi.' : 'Your response could not be synced to the shared server.'}
+              </p>
+            )}
             <PledgeCertificate
               formData={{
                 participantName: lastSubmission.participantName,

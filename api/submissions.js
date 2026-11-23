@@ -1,212 +1,98 @@
-// Vercel Serverless Function: /api/submissions
-// Handles GET (fetch shared submissions), POST (record new audit from any mobile/remote device), DELETE (clear)
-// Integrates with persistent GitHub Gist cloud storage + /tmp fallback so submissions persist across serverless instances
-import fs from 'node:fs';
-import path from 'node:path';
+// Vercel's instances share the configured Gist. Instance-local storage is
+// unsuitable here because the next request may reach a different instance.
+const gistId = process.env.GIST_ID;
+const gistToken = process.env.GIST_TOKEN || process.env.GITHUB_TOKEN;
+let pendingWrite = Promise.resolve();
 
-const GIST_ID = process.env.GIST_ID || '393fca3786758541e1ffa25835329483';
-const GIST_TOKEN = process.env.GIST_TOKEN || process.env.GITHUB_TOKEN;
-const TMP_FILE = path.join('/tmp', 'eco_audit_remote_submissions.json');
-
-// In-memory cache to prevent unnecessary external round-trips
-let memoryCache = {
-  data: null,
-  timestamp: 0
-};
-const CACHE_TTL_MS = 2500; // 2.5 seconds cache
-
-function loadFromTmp() {
-  try {
-    if (fs.existsSync(TMP_FILE)) {
-      const content = fs.readFileSync(TMP_FILE, 'utf-8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Error reading /tmp storage:', err);
+async function gistRequest(method, submissions) {
+  if (!gistId || !gistToken) {
+    throw new Error('Shared storage requires GIST_ID and GIST_TOKEN.');
   }
-  return [];
-}
-
-function saveToTmp(data) {
-  try {
-    fs.writeFileSync(TMP_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Error writing to /tmp storage:', err);
-  }
-}
-
-async function fetchFromGist() {
-  const now = Date.now();
-  if (memoryCache.data && (now - memoryCache.timestamp) < CACHE_TTL_MS) {
-    return memoryCache.data;
-  }
-
-  // 1. Try authenticated GitHub API
-  if (GIST_TOKEN) {
-    try {
-      const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-        headers: {
-          'Authorization': `Bearer ${GIST_TOKEN}`,
-          'User-Agent': 'The-60-Second-Eco-Audit-App',
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-      if (response.ok) {
-        const gist = await response.json();
-        const content = gist.files && gist.files['submissions.json'] && gist.files['submissions.json'].content;
-        if (content) {
-          const parsed = JSON.parse(content);
-          if (Array.isArray(parsed)) {
-            memoryCache = { data: parsed, timestamp: Date.now() };
-            saveToTmp(parsed);
-            return parsed;
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Gist API fetch error:', err);
-    }
-  }
-
-  // 2. Fallback: Public raw Gist URL
-  try {
-    const rawRes = await fetch(`https://gist.githubusercontent.com/shack-dev-j/${GIST_ID}/raw/submissions.json?t=${Date.now()}`);
-    if (rawRes.ok) {
-      const parsed = await rawRes.json();
-      if (Array.isArray(parsed)) {
-        memoryCache = { data: parsed, timestamp: Date.now() };
-        saveToTmp(parsed);
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Raw Gist fetch error:', err);
-  }
-
-  // 3. Fallback: local /tmp
-  const tmpData = loadFromTmp();
-  memoryCache = { data: tmpData, timestamp: Date.now() };
-  return tmpData;
-}
-
-async function saveToGist(submissions) {
-  memoryCache = { data: submissions, timestamp: Date.now() };
-  saveToTmp(submissions);
-
-  if (!GIST_TOKEN) {
-    return false;
-  }
-
-  try {
-    const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${GIST_TOKEN}`,
-        'User-Agent': 'The-60-Second-Eco-Audit-App',
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      body: JSON.stringify({
-        files: {
-          'submissions.json': {
-            content: JSON.stringify(submissions, null, 2)
-          }
-        }
-      })
-    });
-    return response.ok;
-  } catch (err) {
-    console.warn('Gist API save error:', err);
-    return false;
-  }
-}
-
-async function parseBody(req) {
-  if (req.body && typeof req.body === 'object') {
-    return req.body;
-  }
-  if (typeof req.body === 'string' && req.body.trim()) {
-    try {
-      return JSON.parse(req.body);
-    } catch (_) {}
-  }
-  return new Promise((resolve) => {
-    let data = '';
-    req.on('data', chunk => {
-      data += chunk;
-    });
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : null);
-      } catch (e) {
-        resolve(null);
-      }
-    });
-    req.on('error', () => resolve(null));
+  const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${gistToken}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'eco-audit-app',
+      'Cache-Control': 'no-cache'
+    },
+    signal: AbortSignal.timeout(5000),
+    body: submissions && JSON.stringify({
+      files: { 'submissions.json': { content: JSON.stringify(submissions) } }
+    })
   });
+  if (!response.ok) throw new Error(`Gist request failed (${response.status}).`);
+  return response;
+}
+
+async function readSubmissions() {
+  const gist = await (await gistRequest('GET')).json();
+  const file = gist.files?.['submissions.json'];
+  if (!file) return [];
+  if (file.truncated) throw new Error('The submissions file exceeds the Gist API read limit.');
+  const submissions = JSON.parse(file.content);
+  if (!Array.isArray(submissions)) throw new Error('Invalid submissions file.');
+  return submissions;
+}
+
+function writeInOrder(operation) {
+  const result = pendingWrite.then(operation);
+  pendingWrite = result.catch(() => {});
+  return result;
 }
 
 export default async function handler(req, res) {
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  res.setHeader('Cache-Control', 'no-store');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method === 'GET') {
-    const current = await fetchFromGist();
-    return res.status(200).json({
-      success: true,
-      count: current.length,
-      submissions: current
-    });
-  }
-
-  if (req.method === 'POST') {
-    const payload = await parseBody(req);
-
-    if (!payload || typeof payload !== 'object') {
-      return res.status(400).json({ success: false, error: 'Empty or invalid JSON payload' });
+  try {
+    if (req.method === 'GET') {
+      await pendingWrite;
+      const submissions = await readSubmissions();
+      return res.status(200).json({ success: true, count: submissions.length, submissions });
     }
 
-    const current = await fetchFromGist();
+    if (req.method === 'POST') {
+      let payload;
+      try {
+        payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      } catch {
+        return res.status(400).json({ success: false, error: 'Invalid JSON payload.' });
+      }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return res.status(400).json({ success: false, error: 'Invalid submission.' });
+      }
 
-    const enriched = {
-      ...payload,
-      id: payload.id || `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      submittedAt: payload.submittedAt || payload.auditTimestamp || new Date().toISOString(),
-      origin: payload.origin || 'remote_mobile',
-      status: 'synced_remote'
-    };
+      const submission = {
+        ...payload,
+        id: payload.id || crypto.randomUUID(),
+        submittedAt: payload.submittedAt || payload.auditTimestamp || new Date().toISOString(),
+        origin: payload.origin || 'remote_mobile',
+        status: 'synced_remote'
+      };
+      await writeInOrder(async () => {
+        const current = await readSubmissions();
+        await gistRequest('PATCH', [submission, ...current.filter(item => item?.id !== submission.id)]);
+      });
+      return res.status(201).json({ success: true, submission });
+    }
 
-    // Prepend new submission and deduplicate by id
-    const updated = [enriched, ...current.filter(item => item && item.id !== enriched.id)];
-    await saveToGist(updated);
+    if (req.method === 'DELETE') {
+      const adminKey = process.env.ADMIN_CLEAR_KEY;
+      if (!adminKey) {
+        return res.status(503).json({ success: false, error: 'Clear requires ADMIN_CLEAR_KEY on the server.' });
+      }
+      if (req.headers.authorization !== `Bearer ${adminKey}`) {
+        return res.status(403).json({ success: false, error: 'Incorrect admin clear key.' });
+      }
+      await writeInOrder(() => gistRequest('PATCH', []));
+      return res.status(200).json({ success: true, count: 0, submissions: [] });
+    }
 
-    return res.status(201).json({
-      success: true,
-      submission: enriched
-    });
+    res.setHeader('Allow', 'GET, POST, DELETE');
+    return res.status(405).json({ success: false, error: 'Method not allowed.' });
+  } catch (error) {
+    console.error('Shared submissions storage failed:', error.message);
+    return res.status(503).json({ success: false, error: 'Shared storage is unavailable. Please try again.' });
   }
-
-  if (req.method === 'DELETE') {
-    await saveToGist([]);
-    return res.status(200).json({
-      success: true,
-      count: 0,
-      submissions: []
-    });
-  }
-
-  return res.status(405).json({ success: false, error: 'Method not allowed' });
 }

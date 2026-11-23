@@ -13,9 +13,6 @@ import path from 'node:path'
 function submissionApiPlugin() {
   const dataDir = path.resolve(process.cwd(), 'data');
   const dataFile = path.join(dataDir, 'submissions.json');
-  const GIST_ID = process.env.GIST_ID || '393fca3786758541e1ffa25835329483';
-  const GIST_TOKEN = process.env.GIST_TOKEN || process.env.GITHUB_TOKEN;
-
   const ensureStorage = () => {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
@@ -41,22 +38,6 @@ function submissionApiPlugin() {
     fs.writeFileSync(dataFile, JSON.stringify(subs, null, 2), 'utf-8');
   };
 
-  const syncGistBackground = (subs) => {
-    try {
-      fetch(`https://api.github.com/gists/${GIST_ID}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${GIST_TOKEN}`,
-          'User-Agent': 'The-60-Second-Eco-Audit-DevServer',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          files: { 'submissions.json': { content: JSON.stringify(subs, null, 2) } }
-        })
-      }).catch(() => {});
-    } catch (_) {}
-  };
-
   const handleMiddleware = (req, res, next) => {
     const url = req.url ? req.url.split('?')[0] : '';
     if (url !== '/api/submissions') {
@@ -64,9 +45,9 @@ function submissionApiPlugin() {
     }
 
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
 
     if (req.method === 'OPTIONS') {
       res.statusCode = 204;
@@ -95,7 +76,6 @@ function submissionApiPlugin() {
           };
           const updated = [enriched, ...subs.filter(s => s.id !== enriched.id)];
           writeSubmissions(updated);
-          syncGistBackground(updated);
           res.statusCode = 201;
           return res.end(JSON.stringify({ success: true, submission: enriched }));
         } catch (err) {
@@ -108,7 +88,6 @@ function submissionApiPlugin() {
 
     if (req.method === 'DELETE') {
       writeSubmissions([]);
-      syncGistBackground([]);
       res.statusCode = 200;
       return res.end(JSON.stringify({ success: true, count: 0, submissions: [] }));
     }

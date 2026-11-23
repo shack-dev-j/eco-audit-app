@@ -153,6 +153,41 @@ describe('7. User Survey Page & Admin Control Isolation Suite', () => {
   });
 
   describe('Admin Station Route Separation', () => {
+    it('shows complete answers and keeps the log empty after a confirmed clear', async () => {
+      let submissions = [{
+        id: 'sample',
+        participantName: 'Test Auditor',
+        selectedIssues: ['Water leak', { title: 'Lights left on' }],
+        topPriorityTitle: 'Water leak',
+        priorityReason: 'It wastes water every day.',
+        practicalAction: 'Replace the seal.'
+      }];
+      vi.stubGlobal('fetch', vi.fn(async (_url, options) => {
+        if (options.method === 'DELETE') submissions = [];
+        return { ok: true, json: async () => ({ success: true, submissions }) };
+      }));
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      try {
+        const view = render(<AdminPage />);
+        const expand = await screen.findByRole('button', { name: 'View answers for Test Auditor' });
+        fireEvent.click(expand);
+        expect(screen.getByText('Lights left on')).toBeVisible();
+        expect(screen.getByText('It wastes water every day.')).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide answers for Test Auditor' }));
+        expect(screen.getByText('It wastes water every day.')).not.toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+        await screen.findByText('No submissions recorded yet');
+
+        view.unmount();
+        render(<AdminPage />);
+        await screen.findByText('No submissions recorded yet');
+      } finally {
+        confirm.mockRestore();
+        vi.unstubAllGlobals();
+      }
+    });
+
     it('renders the complete Admin Control Center with QR Spot Generator & Question Editor when path is /admin', () => {
       window.history.pushState({}, '', '/admin');
       render(<App />);
